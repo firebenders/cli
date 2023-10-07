@@ -24,7 +24,8 @@ def main():
     # Load CSV file and check format
     with open(args.csv, 'r') as f:
         reader = csv.reader(f)
-        data = list(reader)[:20]
+        next(reader, None)  # Skip the header
+        data = list(reader)
     for row in data:
         if not isinstance(row[0], str):
             raise ValueError("CSV file format is incorrect. Each row should have one column that is a string.")

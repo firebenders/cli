@@ -1,7 +1,7 @@
-import json
 import openai
+from tenacity import retry, wait_exponential
 
-
+@retry(wait=wait_exponential(multiplier=1, min=2, max=60))
 def get_openai_embeddings(api_key, text):
     response = openai.Embedding.create(
         api_key=api_key, input=text, model="text-embedding-ada-002"
@@ -9,6 +9,7 @@ def get_openai_embeddings(api_key, text):
     return response["data"][0]["embedding"]
 
 
+@retry(wait=wait_exponential(multiplier=1, min=2, max=60))
 def get_conversation_answer(api_key, conversation, question):
     completion = openai.ChatCompletion.create(
         api_key=api_key,
