@@ -1,3 +1,5 @@
 .env
 cli/
 env/
+__pycache__
+.vscode/

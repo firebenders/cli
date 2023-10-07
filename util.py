@@ -1,37 +1,55 @@
 import json
 import openai
 
-def get_openai_embeddings(text):
-  response = openai.Embedding.create(
-    input=text,
-    model="text-embedding-ada-002"
-  )
-  return response['data'][0]['embedding']
 
-def get_conversation_answer(conversation, question):
+def get_openai_embeddings(api_key, text):
+    response = openai.Embedding.create(
+        api_key=api_key, input=text, model="text-embedding-ada-002"
+    )
+    return response["data"][0]["embedding"]
+
+
+def get_conversation_answer(api_key, conversation, question):
     completion = openai.ChatCompletion.create(
+        api_key=api_key,
         model="gpt-4",
         messages=[
-           {"role": "system", "content": "You are a helpful product manager. Given the conversation, answer the user's question as concisely as possible. Please always use the defined functions to provide an answer!"},
-           {"role": "user", "content": f"Here is the conversation logs:\n\n {conversation}"},
-           {"role": "user", "content": question}
-           ],
-        functions=[
             {
-                "name": "answer",
-                "description": "Provide concise answer to user request, and if there is no clear answer then do not specify it",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "answer": {
-                            "type": "string",
-                            "description": "The answer",
-                        },
-                    },
-                },
-            }
-        ],
+                "role": "system",
+                "content": """You are a highly intelligent assistant with a deep understanding of product management. Given the conversation, provide a detailed and concise answer to the user's question. If there is no explicit information within the conversation, then you must respond with 'N/A'. If you are not sure, then respond with 'N/A'. Your response should always be a phrase less than or equal to 10 words!
+
+Example #1 No explicit information
+
+question: what did the user not like about the ai?
+
+conversation:
+joe: hi how are you?
+ai: I'm doing well. How are you?
+joe: good!
+
+answer:
+N/A
+
+Example #2 Concise answers (10 words maximum!)
+
+question: why did the user have frustration?
+
+conversation:
+billy: hi how are you?
+ai: Honestly joe, how can you not know I'm an AI without feelings. I can't believe I have to talk with you. You are a horrible user and customer.
+billy: wow I'll never use this product again
+
+answer:
+combative language and unnecessary insults
+""",
+            },
+            {
+                "role": "user",
+                "content": f"Here is the conversation logs:\n{conversation}",
+            },
+            {"role": "user", "content": question},
+        ]
     )
 
-    fn_args = json.loads(completion.choices[0].message.function_call.arguments)
-    return fn_args['answer'] if 'answer' in fn_args else None
+    answer = completion['choices'][0]['message']['content']
+    return None if answer.lower() == 'n/a' else answer
