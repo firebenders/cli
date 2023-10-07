@@ -1,3 +1,4 @@
+import json
 import openai
 
 def get_openai_embeddings(text):
@@ -7,20 +8,24 @@ def get_openai_embeddings(text):
   )
   return response['data'][0]['embedding']
 
-def get_bad_ux_reason(conversation):
+def get_conversation_answer(conversation, question):
     completion = openai.ChatCompletion.create(
         model="gpt-4",
-        messages=[{"role": "system", "content": f"Please find the reason for bad user experience if there is one. Please call set_bad_ux_reason always. Thanks! Here is the conversation logs:\n\n {conversation}"}],
+        messages=[
+           {"role": "system", "content": "You are a helpful product manager. Given the conversation, answer the user's question as concisely as possible. Please always use the defined functions to provide an answer!"},
+           {"role": "user", "content": f"Here is the conversation logs:\n\n {conversation}"},
+           {"role": "user", "content": question}
+           ],
         functions=[
             {
-                "name": "set_bad_ux_reason",
-                "description": "Provide the exact and concise reason for bad user experience if it exists",
+                "name": "answer",
+                "description": "Provide concise answer to user request, and if there is no clear answer then do not specify it",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "reason": {
+                        "answer": {
                             "type": "string",
-                            "description": "The reason for bad user experience if it exists, otherwise do not define",
+                            "description": "The answer",
                         },
                     },
                 },
@@ -29,4 +34,4 @@ def get_bad_ux_reason(conversation):
     )
 
     fn_args = json.loads(completion.choices[0].message.function_call.arguments)
-    return fn_args['reason'] if 'reason' in fn_args else None
+    return fn_args['answer'] if 'answer' in fn_args else None
