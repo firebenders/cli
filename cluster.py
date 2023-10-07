@@ -8,26 +8,47 @@ class Conversation:
     gptAnswer: Optional[str]
     gptEmbedding: Optional[List[float]]
 
+    def __init__(self, id: int, conversation: str, gptAnswer: Optional[str], gptEmbedding: Optional[List[float]]):
+        self.id = id
+        self.conversation = conversation
+        self.gptAnswer = gptAnswer
+        self.gptEmbedding = gptEmbedding
+
 class Cluster:
     id: int
     name: str
     conversations: List[int] # List of conversation ids
 
+    def __init__(self, id: int, name: str, conversations: List[int]):
+        self.id = id
+        self.name = name
+        self.conversations = conversations
+
 class InputData:
     question: str
     conversations: List[Conversation]
+
+    def __init__(self, question: str, conversations: List[Conversation]):
+        self.question = question
+        self.conversations = conversations
 
 class OutputData:
     question: str
     conversations: List[Conversation]
     clusters: List[Cluster]
 
+    def __init__(self, question: str, conversations: List[Conversation], clusters: List[Cluster]):
+        self.question = question
+        self.conversations = conversations
+        self.clusters = clusters
+
 def cluster(input_data: InputData) -> OutputData:
     def calculate_best_k_elbow(embeddings: List[List[float]]) -> int:
+        print(len(embeddings))
         # Initialize a list to store the distortions (sum of squared distances from each point to its center)
         distortions = []
         # Define the range of 'k' values we want to test
-        K = range(1,20)
+        K = range(1, min(len(embeddings) + 1, 20))
         # Loop over the 'k' values
         for k in K:
             # Create a KMeans model with 'k' clusters
@@ -36,6 +57,9 @@ def cluster(input_data: InputData) -> OutputData:
             kmeanModel.fit(embeddings)
             # Append the model's inertia (sum of squared distances of samples to their closest cluster center) to our distortions list
             distortions.append(kmeanModel.inertia_)
+
+        if len(K) <= 1:
+            return len(K)
 
         # Calculate the derivative of the distortions to find 'elbows'
         deltas = [j-i for i, j in zip(distortions[:-1], distortions[1:])]
@@ -51,7 +75,7 @@ def cluster(input_data: InputData) -> OutputData:
     null_conversations = [conversation for conversation in input_data.conversations if conversation.gptEmbedding is None]
 
     # Calculate best k
-    num_clusters = calculate_best_k_elbow(input_data.conversations)
+    num_clusters = calculate_best_k_elbow(embeddings)
     print(f'Number of clusters: {num_clusters}')
     # Cluster embeddings
     k_means_model = KMeans(n_clusters=num_clusters, n_init=10, random_state=42)
@@ -62,15 +86,17 @@ def cluster(input_data: InputData) -> OutputData:
 
     # Assign non-null embeddings to clusters
     cluster_id_set = set()
-    for i in enumerate(non_null_conversations):
-        if k_means_model[i] not in cluster_id_set:
-            cluster_id_set.add(k_means_model[i])
-            new_cluster = Cluster(id=k_means_model[i], name=non_null_conversations[i].gptAnswer, conversations=[])
+    for i, _ in enumerate(non_null_conversations):
+        if k_means_model.labels_[i] not in cluster_id_set:
+            cluster_id_set.add(k_means_model.labels_[i])
+            new_cluster = Cluster(id=k_means_model.labels_[i], name=non_null_conversations[i].gptAnswer, conversations=[])
             clusters.append(new_cluster)
-        clusters[k_means_model[i]].conversations.append(non_null_conversations[i])
+        print(k_means_model.labels_)
+        print(clusters)
+        clusters[k_means_model.labels_[i]].conversations.append(non_null_conversations[i].id)
 
     # Assign null embeddings to -1 cluster
-    null_cluster = Cluster(id='-1', name='Null', conversations=null_conversations)
+    null_cluster = Cluster(id='-1', name='Null', conversations=[conversation.id for conversation in null_conversations])
     clusters.append(null_cluster)
 
     return OutputData(clusters=clusters, conversations=input_data.conversations, question=input_data.question)
@@ -90,10 +116,8 @@ def write_to_csv(output_data: OutputData, filename: str = 'output.csv') -> None:
         
         # Write headers
         csv_writer.writerow(['Conversation', 'GPT Answer', 'Cluster ID'])
-        
         # Create a dictionary for faster lookup of conversations by their ID
         conversation_dict = {c.id: c for c in output_data.conversations}
-        
         # Write rows
         for cluster in output_data.clusters:
             for conv_id in cluster.conversations:
