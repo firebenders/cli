@@ -81,24 +81,19 @@ def cluster(input_data: InputData) -> OutputData:
     k_means_model = KMeans(n_clusters=num_clusters, n_init=10, random_state=42)
     k_means_model.fit(embeddings)
 
-    # Create cluster list
-    clusters: List[Cluster] = []
-
     # Assign non-null embeddings to clusters
-    cluster_id_set = set()
+    cluster_map = {}
     for i, _ in enumerate(non_null_conversations):
-        if k_means_model.labels_[i] not in cluster_id_set:
-            cluster_id_set.add(k_means_model.labels_[i])
-            new_cluster = Cluster(id=k_means_model.labels_[i], name=non_null_conversations[i].gptAnswer, conversations=[])
-            clusters.append(new_cluster)
-        print(k_means_model.labels_)
-        print(clusters)
-        clusters[k_means_model.labels_[i]].conversations.append(non_null_conversations[i].id)
+        if k_means_model.labels_[i] not in cluster_map.keys():
+            new_cluster = Cluster(id=int(k_means_model.labels_[i]), name=non_null_conversations[i].gptAnswer, conversations=[])
+            cluster_map[k_means_model.labels_[i]] = new_cluster
+        cluster_map[k_means_model.labels_[i]].conversations.append(non_null_conversations[i].id)
 
     # Assign null embeddings to -1 cluster
-    null_cluster = Cluster(id='-1', name='Null', conversations=[conversation.id for conversation in null_conversations])
-    clusters.append(null_cluster)
+    null_cluster = Cluster(id=-1, name='Null', conversations=[conversation.id for conversation in null_conversations])
+    cluster_map[-1] = null_cluster
 
+    clusters = sorted(list(cluster_map.values()), key=lambda cluster: cluster.id)
     return OutputData(clusters=clusters, conversations=input_data.conversations, question=input_data.question)
 
 def write_to_csv(output_data: OutputData, filename: str = 'output.csv') -> None:
